@@ -1,0 +1,30 @@
+export const productiveKeywords = [
+    "tutorial",
+    "course",
+    "learn",
+    "javascript",
+    "react",
+    "nextjs",
+    "python",
+    "design",
+    "sketch",
+    "figma",
+    "coding",
+    "development",
+    "aws",
+    "docker",
+    "mongodb",
+    "interview",
+];
+
+export const distractingKeywords = [
+    "prank",
+    "meme",
+    "funny",
+    "highlights",
+    "gaming",
+    "reaction",
+    "vlog",
+    "roast",
+    "shorts",
+];
