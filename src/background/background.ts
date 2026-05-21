@@ -1,4 +1,6 @@
 import { classifyYouTubeVideo } from "../utils/classifier";
+import { classifyDomain } from "../utils/domainClassifier";
+import { updateStats } from "../storage/statsStorage";
 
 let startTime: number | null = null;
 
@@ -7,12 +9,6 @@ let currentClassification:
   | "distracting"
   | "neutral"
   | null = null;
-
-const stats = {
-  productive: 0,
-  distracting: 0,
-  neutral: 0,
-};
 
 let trackingTimeout: ReturnType<
   typeof setTimeout
@@ -34,7 +30,7 @@ function startTracking(
   );
 }
 
-function stopTracking() {
+async function stopTracking() {
   if (!startTime || !currentClassification)
     return;
 
@@ -55,14 +51,16 @@ function stopTracking() {
     return;
   }
 
-  stats[currentClassification] += duration;
+  await updateStats(
+    currentClassification,
+    duration
+  );
 
   console.log("Tracking Stopped");
 
   console.log({
     classification: currentClassification,
     duration,
-    stats,
   });
 
   startTime = null;
@@ -95,7 +93,7 @@ async function handleTracking(tabId: number) {
     }
 
     // stop previous activity first
-    stopTracking();
+    await stopTracking();
 
     // save current activity
     currentActivityKey = activityKey;
@@ -103,9 +101,10 @@ async function handleTracking(tabId: number) {
     let classification:
       | "productive"
       | "distracting"
-      | "neutral" = "neutral";
+      | "neutral" =
+      classifyDomain(tab.url);
 
-    // YouTube Classification
+    // YouTube gets smarter title-based logic
     if (
       tab.url.includes("youtube.com/watch")
     ) {
@@ -134,6 +133,21 @@ function debouncedHandleTracking(
   trackingTimeout = setTimeout(() => {
     handleTracking(tabId);
   }, 1000);
+}
+
+async function resumeTracking() {
+  try {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+
+    if (!tab?.id) return;
+
+    debouncedHandleTracking(tab.id);
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 // when user switches tabs
@@ -167,7 +181,12 @@ chrome.idle.onStateChanged.addListener(
     console.log("Idle State:", state);
 
     if (state !== "active") {
-      stopTracking();
+      void stopTracking();
+    }
+
+    // auto resume tracking
+    if (state === "active") {
+      void resumeTracking();
     }
   }
 );
