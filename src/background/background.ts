@@ -1,6 +1,12 @@
 import { classifyYouTubeVideo } from "../utils/classifier";
 import { classifyDomain } from "../utils/domainClassifier";
 import { updateStats } from "../storage/statsStorage";
+import {
+  startSession,
+  stopSession,
+  getCurrentSession,
+} from "../services/sessionService";
+import { sessionPresets } from "../constants/sessions";
 
 let startTime: number | null = null;
 
@@ -74,6 +80,13 @@ async function handleTracking(tabId: number) {
   try {
     const tab = await chrome.tabs.get(tabId);
 
+    const activeSession =
+      await getCurrentSession();
+
+    const sessionConfig = activeSession
+      ? sessionPresets[activeSession.type]
+      : null;
+
     if (!tab.url || !tab.title) return;
 
     // ignore browser internal pages
@@ -97,6 +110,11 @@ async function handleTracking(tabId: number) {
 
     // save current activity
     currentActivityKey = activityKey;
+
+    console.log(
+      "Active Session Config:",
+      sessionConfig
+    );
 
     let classification:
       | "productive"
@@ -145,6 +163,28 @@ async function resumeTracking() {
     if (!tab?.id) return;
 
     debouncedHandleTracking(tab.id);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function restoreSession() {
+  try {
+    const session =
+      await getCurrentSession();
+
+    if (!session) {
+      console.log(
+        "No Active Session To Restore"
+      );
+
+      return;
+    }
+
+    console.log(
+      "Restored Session:",
+      session
+    );
   } catch (error) {
     console.error(error);
   }
@@ -199,3 +239,12 @@ chrome.runtime.onInstalled.addListener(
     );
   }
 );
+
+
+(globalThis as any).testSession = {
+  startSession,
+  stopSession,
+  getCurrentSession,
+};
+
+void restoreSession();
