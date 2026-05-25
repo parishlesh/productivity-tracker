@@ -1,5 +1,3 @@
-import { classifyYouTubeVideo } from "../utils/classifier";
-import { classifyDomain } from "../utils/domainClassifier";
 import { updateStats } from "../storage/statsStorage";
 import {
   startSession,
@@ -7,6 +5,8 @@ import {
   getCurrentSession,
 } from "../services/sessionService";
 import { sessionPresets } from "../constants/sessions";
+import { classifyActivity } from "../utils/activityClassifier";
+import { SessionStats } from "../types/session";
 
 let startTime: number | null = null;
 
@@ -22,6 +22,14 @@ let trackingTimeout: ReturnType<
 
 // unique activity identity
 let currentActivityKey: string | null = null;
+
+let sessionStats: SessionStats = {
+  productive: 0,
+
+  distracting: 0,
+
+  neutral: 0,
+};
 
 function startTracking(
   classification: "productive" | "distracting" | "neutral"
@@ -61,6 +69,20 @@ async function stopTracking() {
     currentClassification,
     duration
   );
+
+  const activeSession =
+    await getCurrentSession();
+
+  if (activeSession) {
+    sessionStats[
+      currentClassification
+    ] += duration;
+
+    console.log(
+      "Updated Session Stats:",
+      sessionStats
+    );
+  }
 
   console.log("Tracking Stopped");
 
@@ -116,19 +138,12 @@ async function handleTracking(tabId: number) {
       sessionConfig
     );
 
-    let classification:
-      | "productive"
-      | "distracting"
-      | "neutral" =
-      classifyDomain(tab.url);
-
-    // YouTube gets smarter title-based logic
-    if (
-      tab.url.includes("youtube.com/watch")
-    ) {
-      classification =
-        classifyYouTubeVideo(tab.title);
-    }
+    const classification =
+      classifyActivity({
+        url: tab.url,
+        title: tab.title,
+        sessionConfig,
+      });
 
     console.log({
       title: tab.title,
@@ -221,7 +236,23 @@ chrome.idle.onStateChanged.addListener(
     console.log("Idle State:", state);
 
     if (state !== "active") {
-      void stopTracking();
+      void (async () => {
+        await stopTracking();
+
+        const finalSessionStats = {
+          ...sessionStats,
+        };
+
+        await stopSession(
+          finalSessionStats
+        );
+
+        sessionStats = {
+          productive: 0,
+          distracting: 0,
+          neutral: 0,
+        };
+      })();
     }
 
     // auto resume tracking

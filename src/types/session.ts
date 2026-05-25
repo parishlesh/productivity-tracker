@@ -28,3 +28,25 @@ export type ActiveSession = {
 
     active: boolean;
 };
+
+export type SessionStats = {
+    productive: number;
+
+    distracting: number;
+
+    neutral: number;
+};
+
+export type CompletedSession = {
+    type: SessionType;
+
+    startedAt: string;
+
+    endedAt: string;
+
+    duration: number;
+
+    stats: SessionStats;
+
+    focusScore: number;
+};

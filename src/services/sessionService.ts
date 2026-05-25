@@ -4,6 +4,14 @@ import {
     clearActiveSession,
 } from "../storage/sessionStorage";
 
+import { saveCompletedSession }
+from "../storage/completedSessionStorage";
+
+import {
+  CompletedSession,
+  SessionStats,
+} from "../types/session";
+
 import {
     ActiveSession,
     SessionType,
@@ -30,26 +38,81 @@ export async function startSession(
     return session;
 }
 
-export async function stopSession() {
-    const session =
-        await getActiveSession();
+export async function stopSession(
+  sessionStats?: SessionStats
+) {
+  const session =
+    await getActiveSession();
 
-    if (!session) {
-        console.log(
-            "No Active Session Found"
-        );
-
-        return;
-    }
-
-    await clearActiveSession();
-
+  if (!session) {
     console.log(
-        "Session Stopped:",
-        session
+      "No Active Session Found"
     );
 
-    return session;
+    return;
+  }
+
+  const endedAt =
+    new Date().toISOString();
+
+  const duration = Math.floor(
+    (
+      new Date(endedAt).getTime() -
+      new Date(
+        session.startedAt
+      ).getTime()
+    ) / 1000
+  );
+
+  const stats = sessionStats || {
+    productive: 0,
+    distracting: 0,
+    neutral: 0,
+  };
+
+  const totalTracked =
+    stats.productive +
+    stats.distracting +
+    stats.neutral;
+
+  const focusScore =
+    totalTracked === 0
+      ? 0
+      : Math.round(
+          (
+            stats.productive /
+            totalTracked
+          ) * 100
+        );
+
+  const completedSession: CompletedSession =
+    {
+      type: session.type,
+
+      startedAt:
+        session.startedAt,
+
+      endedAt,
+
+      duration,
+
+      stats,
+
+      focusScore,
+    };
+
+  await saveCompletedSession(
+    completedSession
+  );
+
+  await clearActiveSession();
+
+  console.log(
+    "Session Stopped:",
+    completedSession
+  );
+
+  return completedSession;
 }
 
 export async function getCurrentSession() {
